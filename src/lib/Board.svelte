@@ -7,6 +7,9 @@
   let boardElement: HTMLElement;
   let errorCells = new Set<number>();
   let mode: 'solution' | 'pencil' = 'solution';
+  let isDragging = false;
+  let selectedCells = new Set<number>();
+  let dragStartIndex: number | null = null;
 
   function toggleMode() {
     mode = mode === 'solution' ? 'pencil' : 'solution';
@@ -15,12 +18,33 @@
   function handleCellClick(index: number, event: MouseEvent) {
     event.stopPropagation();
     selectedIndex = index;
+    selectedCells = new Set([index]);
     validateAllConflicts();
+  }
+
+  function handleCellMouseDown(index: number, event: MouseEvent) {
+    event.preventDefault();
+    isDragging = true;
+    dragStartIndex = index;
+    selectedCells = new Set([index]);
+    selectedIndex = index;
+    validateAllConflicts();
+  }
+
+  function handleCellMouseEnter(index: number) {
+    if (!isDragging) return;
+    selectedCells.add(index);
+    selectedCells = selectedCells; // trigger reactivity
+  }
+
+  function handleWindowMouseUp() {
+    isDragging = false;
   }
 
   function handleWindowClick(event: MouseEvent) {
     if (!boardElement.contains(event.target as Node)) {
       selectedIndex = null;
+      selectedCells.clear();
       errorCells.clear();
       errorCells = errorCells; // trigger reactivity
     }
@@ -73,7 +97,7 @@
     const newErrorCells = new Set<number>();
     
     // Check all cells that were previously in error or the selected cell
-    const cellsToCheck = new Set([...errorCells, ...(selectedIndex !== null ? [selectedIndex] : [])]);
+    const cellsToCheck = new Set([...errorCells, ...(selectedCells.size > 0 ? Array.from(selectedCells) : [])]);
     
     for (const index of cellsToCheck) {
       const conflictIndex = findConflict(index, values[index]);
@@ -87,29 +111,32 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (selectedIndex === null) return;
+    if (selectedCells.size === 0) return;
     
     const num = parseInt(event.key);
     if (num >= 1 && num <= 9) {
-      if (mode === 'solution') {
-        // Clear pencil marks when entering a value
-        pencilMarks[selectedIndex] = new Set<string>();
-        values[selectedIndex] = event.key;
-        values = values; // trigger reactivity
-        pencilMarks = pencilMarks; // trigger reactivity
-        validateAllConflicts();
-      } else {
-        // Don't allow pencil marks if cell has a value
-        if (values[selectedIndex]) return;
-        
-        const marks = pencilMarks[selectedIndex];
-        if (marks.has(event.key)) {
-          marks.delete(event.key);
+      const useForcesPencilMode = selectedCells.size > 1;
+      
+      for (const index of selectedCells) {
+        if (!useForcesPencilMode && mode === 'solution') {
+          // Clear pencil marks when entering a value
+          pencilMarks[index] = new Set<string>();
+          values[index] = event.key;
         } else {
-          marks.add(event.key);
+          // Don't allow pencil marks if cell has a value
+          if (values[index]) continue;
+          
+          const marks = pencilMarks[index];
+          if (marks.has(event.key)) {
+            marks.delete(event.key);
+          } else {
+            marks.add(event.key);
+          }
         }
-        pencilMarks = [...pencilMarks]; // trigger reactivity
       }
+      values = [...values]; // trigger reactivity
+      pencilMarks = [...pencilMarks]; // trigger reactivity
+      validateAllConflicts();
     }
   }
 
@@ -122,16 +149,28 @@
   $: selectedCol = selectedIndex !== null ? selectedIndex % 9 : null;
 
   function isInSelectedRowOrCol(index: number): boolean {
-    if (selectedIndex === null) return false;
+    if (selectedIndex === null || selectedCells.size > 1) return false;
     const row = Math.floor(index / 9);
     const col = index % 9;
     return row === selectedRow || col === selectedCol;
+  }
+
+  function hasMatchingPencilMark(index: number): boolean {
+    if (selectedIndex === null || !values[selectedIndex]) return false;
+    const selectedValue = values[selectedIndex];
+    const indices = new Set([
+      ...getRow(selectedIndex),
+      ...getColumn(selectedIndex),
+      ...getBox(selectedIndex)
+    ]);
+    return indices.has(index) && pencilMarks[index].has(selectedValue);
   }
 </script>
 
 <svelte:window 
   on:keydown={handleKeydown}
   on:click={handleWindowClick}
+  on:mouseup={handleWindowMouseUp}
 />
 
 <div class="controls">
@@ -147,12 +186,15 @@
   {#each cells as cell, i}
     <div 
       class="cell" 
-      class:selected={selectedIndex === i}
+      class:selected={selectedCells.has(i)}
       class:highlighted={isInSelectedRowOrCol(i)}
       class:error={errorCells.has(i)}
-      class:pencil={mode === 'pencil' && !values[i] && pencilMarks[i].size > 0}
+      class:has-pencil-marks={!values[i] && pencilMarks[i].size > 0}
+      class:matching-pencil={hasMatchingPencilMark(i)}
       data-index={i}
       on:click={(e) => handleCellClick(i, e)}
+      on:mousedown={(e) => handleCellMouseDown(i, e)}
+      on:mouseenter={() => handleCellMouseEnter(i)}
     >
       {#if values[i]}
         {values[i]}
@@ -236,7 +278,11 @@
     background-color: #ffebee;
   }
 
-  .cell.pencil {
+  .cell.matching-pencil {
+    background-color: #fff3e0;
+  }
+
+  .has-pencil-marks {
     font-size: 0.7rem;
   }
 
