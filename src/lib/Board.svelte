@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { processImage } from './processImage';
+
   // Create a 9x9 grid of cells
   const cells = Array(81).fill(null);
   let selectedIndex: number | null = null;
@@ -12,6 +14,7 @@
   let dragStartIndex: number | null = null;
   let isInitializationMode = false;
   let lockedCells = new Set<number>();
+  let isDraggingFile = false;
 
   function startNewGame() {
     values = Array(81).fill('');
@@ -72,6 +75,51 @@
       selectedCells.clear();
       errorCells.clear();
       errorCells = errorCells; // trigger reactivity
+    }
+  }
+
+  function handleDragEnter(e: DragEvent) {
+    e.preventDefault();
+    isDraggingFile = true;
+  }
+
+  function handleDragLeave(e: DragEvent) {
+    e.preventDefault();
+    isDraggingFile = false;
+  }
+
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+  }
+
+  async function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    isDraggingFile = false;
+
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith('image/')) {
+      alert('Please drop an image file');
+      return;
+    }
+
+    try {
+      // Process image with Google Cloud Vision
+      const grid = await processImage(file);
+      
+      // Update the board with the extracted numbers
+      values = grid.flat().map(val => val || '');
+      
+      // Set initialization mode to allow editing
+      isInitializationMode = true;
+      
+      // Validate the board
+      validateAllConflicts();
+    } catch (error) {
+      console.error('Error processing image:', error);
+      alert('Error processing image. Please try again.');
     }
   }
 
@@ -217,7 +265,12 @@
 
 <div 
   class="board"
+  class:dragging={isDraggingFile}
   bind:this={boardElement}
+  on:dragenter={handleDragEnter}
+  on:dragleave={handleDragLeave}
+  on:dragover={handleDragOver}
+  on:drop={handleDrop}
 >
   {#each cells as cell, i}
     <div 
@@ -276,6 +329,23 @@
     aspect-ratio: 1;
     border: 2px solid #666;
     box-sizing: border-box;
+    position: relative;
+  }
+
+  .board.dragging::after {
+    content: "Drop image here";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    z-index: 10;
   }
 
   .cell {
