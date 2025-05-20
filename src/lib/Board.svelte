@@ -3,8 +3,14 @@
   const cells = Array(81).fill(null);
   let selectedIndex: number | null = null;
   let values = Array(81).fill('');
+  let pencilMarks = Array(81).fill(null).map(() => new Set<string>());
   let boardElement: HTMLElement;
   let errorCells = new Set<number>();
+  let mode: 'solution' | 'pencil' = 'solution';
+
+  function toggleMode() {
+    mode = mode === 'solution' ? 'pencil' : 'solution';
+  }
 
   function handleCellClick(index: number, event: MouseEvent) {
     event.stopPropagation();
@@ -85,10 +91,31 @@
     
     const num = parseInt(event.key);
     if (num >= 1 && num <= 9) {
-      values[selectedIndex] = event.key;
-      values = values; // trigger reactivity
-      validateAllConflicts();
+      if (mode === 'solution') {
+        // Clear pencil marks when entering a value
+        pencilMarks[selectedIndex] = new Set<string>();
+        values[selectedIndex] = event.key;
+        values = values; // trigger reactivity
+        pencilMarks = pencilMarks; // trigger reactivity
+        validateAllConflicts();
+      } else {
+        // Don't allow pencil marks if cell has a value
+        if (values[selectedIndex]) return;
+        
+        const marks = pencilMarks[selectedIndex];
+        if (marks.has(event.key)) {
+          marks.delete(event.key);
+        } else {
+          marks.add(event.key);
+        }
+        pencilMarks = [...pencilMarks]; // trigger reactivity
+      }
     }
+  }
+
+  function formatPencilMarks(marks: Set<string>): string[] {
+    // Return an array of 9 elements, with numbers in their positions or empty strings
+    return Array(9).fill('').map((_, i) => marks.has((i + 1).toString()) ? (i + 1).toString() : '');
   }
 
   $: selectedRow = selectedIndex !== null ? Math.floor(selectedIndex / 9) : null;
@@ -107,6 +134,12 @@
   on:click={handleWindowClick}
 />
 
+<div class="controls">
+  <button on:click={toggleMode}>
+    Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
+  </button>
+</div>
+
 <div 
   class="board"
   bind:this={boardElement}
@@ -117,15 +150,41 @@
       class:selected={selectedIndex === i}
       class:highlighted={isInSelectedRowOrCol(i)}
       class:error={errorCells.has(i)}
+      class:pencil={mode === 'pencil' && !values[i] && pencilMarks[i].size > 0}
       data-index={i}
       on:click={(e) => handleCellClick(i, e)}
     >
-      {values[i]}
+      {#if values[i]}
+        {values[i]}
+      {:else if pencilMarks[i].size > 0}
+        <div class="pencil-marks">
+          {#each formatPencilMarks(pencilMarks[i]) as mark}
+            <div class="pencil-mark">{mark}</div>
+          {/each}
+        </div>
+      {/if}
     </div>
   {/each}
 </div>
 
 <style>
+  .controls {
+    margin-bottom: 1rem;
+  }
+
+  button {
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    border: 1px solid #666;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+  }
+
+  button:hover {
+    background: #f0f0f0;
+  }
+
   .board {
     display: grid;
     grid-template-columns: repeat(9, 1fr);
@@ -175,5 +234,25 @@
 
   .cell.error {
     background-color: #ffebee;
+  }
+
+  .cell.pencil {
+    font-size: 0.7rem;
+  }
+
+  .pencil-marks {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    height: 100%;
+    width: 100%;
+  }
+
+  .pencil-mark {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
   }
 </style> 
