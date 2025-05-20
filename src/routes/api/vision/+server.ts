@@ -6,6 +6,10 @@ interface Detection {
   vertices: Array<{x: number; y: number}>;
 }
 
+function createVisualGrid(grid: string[][]) {
+  return '\nVisual Grid:\n' + grid.map(row => row.join(' ')).join('\n');
+}
+
 export async function POST({ request }) {
   try {
     const formData = await request.formData();
@@ -25,6 +29,8 @@ export async function POST({ request }) {
       }
     });
 
+    console.log('Cloud Vision Response:', JSON.stringify(result, null, 2));
+
     const fullTextAnnotation = result.fullTextAnnotation;
     if (!fullTextAnnotation || !fullTextAnnotation.pages || fullTextAnnotation.pages.length === 0) {
       return json({ error: 'No text detected in image' }, { status: 400 });
@@ -41,6 +47,20 @@ export async function POST({ request }) {
     // Process blocks to find individual digits
     const processedDetections: Detection[] = [];
     
+    // Log all detected text first
+    console.log('\nAll detected text blocks:');
+    (page.blocks || []).forEach((block, blockIndex) => {
+      console.log(`\nBlock ${blockIndex}:`);
+      (block.paragraphs || []).forEach((paragraph, paragraphIndex) => {
+        console.log(`  Paragraph ${paragraphIndex}:`);
+        (paragraph.words || []).forEach((word, wordIndex) => {
+          const text = word.symbols?.map(s => s.text).join('') || '';
+          console.log(`    Word ${wordIndex}: "${text}", Vertices:`, word.boundingBox?.vertices);
+        });
+      });
+    });
+
+    // Process digits
     for (const block of page.blocks || []) {
       for (const paragraph of block.paragraphs || []) {
         for (const word of paragraph.words || []) {
@@ -51,6 +71,9 @@ export async function POST({ request }) {
 
           // If it's a multi-digit number, split it and estimate positions
           if (text.length > 1) {
+            console.log(`\nSplitting multi-digit number: "${text}"`);
+            console.log('Original vertices:', vertices);
+            
             const charWidth = (vertices[1].x! - vertices[0].x!) / text.length;
             text.split('').forEach((digit, index) => {
               if (/^[1-9]$/.test(digit)) {
@@ -59,6 +82,7 @@ export async function POST({ request }) {
                   x: (v.x || 0) + offsetX,
                   y: v.y || 0
                 }));
+                console.log(`Digit "${digit}" estimated vertices:`, digitVertices);
                 processedDetections.push({ text: digit, vertices: digitVertices });
               }
             });
@@ -97,31 +121,30 @@ export async function POST({ request }) {
       const centerX = vertices.reduce((sum, v) => sum + v.x, 0) / 4;
       const centerY = vertices.reduce((sum, v) => sum + v.y, 0) / 4;
 
-      // Adjust for margin
+      // Simple position calculation without any corrections
       const adjustedX = centerX - margin;
       const adjustedY = centerY - margin;
-
-      // Calculate grid position
       const col = Math.floor(adjustedX / cellWidth);
       const row = Math.floor(adjustedY / cellHeight);
 
-      console.log(`Text "${text}":
-        Center: (${centerX}, ${centerY})
-        Adjusted: (${adjustedX}, ${adjustedY})
-        Cell Size: ${cellWidth} x ${cellHeight}
+      console.log(`\nText "${text}":
+        Raw Vertices: ${JSON.stringify(vertices)}
+        Center: (${centerX.toFixed(1)}, ${centerY.toFixed(1)})
+        Adjusted: (${adjustedX.toFixed(1)}, ${adjustedY.toFixed(1)})
+        Cell Size: ${cellWidth.toFixed(1)} x ${cellHeight.toFixed(1)}
         Grid Position: [${row}, ${col}]`);
 
       if (row >= 0 && row < 9 && col >= 0 && col < 9) {
+        if (grid[row][col] !== '') {
+          console.log(`WARNING: Overwriting position [${row}, ${col}] from "${grid[row][col]}" to "${text}"`);
+        }
         grid[row][col] = text;
       } else {
         console.log(`Skipping text "${text}" - position out of bounds`);
       }
     }
 
-    console.log('\nFinal Grid:');
-    grid.forEach((row, i) => {
-      console.log(`Row ${i}:`, row.join(' '));
-    });
+    console.log(createVisualGrid(grid));
 
     return json({ grid });
   } catch (error) {
