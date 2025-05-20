@@ -10,6 +10,31 @@
   let isDragging = false;
   let selectedCells = new Set<number>();
   let dragStartIndex: number | null = null;
+  let isInitializationMode = false;
+  let lockedCells = new Set<number>();
+
+  function startNewGame() {
+    values = Array(81).fill('');
+    pencilMarks = Array(81).fill(null).map(() => new Set<string>());
+    errorCells.clear();
+    selectedCells.clear();
+    selectedIndex = null;
+    lockedCells.clear();
+    isInitializationMode = true;
+    mode = 'solution';
+  }
+
+  function finishInitialization() {
+    if (isInitializationMode) {
+      // Lock all non-empty cells
+      values.forEach((value, index) => {
+        if (value) {
+          lockedCells.add(index);
+        }
+      });
+      isInitializationMode = false;
+    }
+  }
 
   function toggleMode() {
     mode = mode === 'solution' ? 'pencil' : 'solution';
@@ -118,6 +143,9 @@
       const useForcesPencilMode = selectedCells.size > 1;
       
       for (const index of selectedCells) {
+        // Don't modify locked cells unless in initialization mode
+        if (lockedCells.has(index) && !isInitializationMode) continue;
+
         if (!useForcesPencilMode && mode === 'solution') {
           // Clear pencil marks when entering a value
           pencilMarks[index] = new Set<string>();
@@ -174,6 +202,14 @@
 />
 
 <div class="controls">
+  <button on:click={startNewGame}>
+    New Game
+  </button>
+  {#if isInitializationMode}
+    <button on:click={finishInitialization}>
+      Done Setting Up
+    </button>
+  {/if}
   <button on:click={toggleMode}>
     Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
   </button>
@@ -191,6 +227,7 @@
       class:error={errorCells.has(i)}
       class:has-pencil-marks={!values[i] && pencilMarks[i].size > 0}
       class:matching-pencil={hasMatchingPencilMark(i)}
+      class:locked={lockedCells.has(i)}
       data-index={i}
       on:click={(e) => handleCellClick(i, e)}
       on:mousedown={(e) => handleCellMouseDown(i, e)}
@@ -211,6 +248,8 @@
 
 <style>
   .controls {
+    display: flex;
+    gap: 1rem;
     margin-bottom: 1rem;
   }
 
@@ -300,5 +339,10 @@
     justify-content: center;
     width: 100%;
     height: 100%;
+  }
+
+  .cell.locked {
+    color: #1976d2;
+    font-weight: bold;
   }
 </style> 
