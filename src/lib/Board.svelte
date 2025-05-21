@@ -27,6 +27,7 @@
   let shareUrl: string = '';
   let uploadError: string | null = null;
   let showToast = false;
+  let isProcessingImage = false;
 
   // Highlighting state
   type HighlightColor = 'red' | 'green' | 'blue';
@@ -183,6 +184,7 @@
     if (!isInitializationMode) return;
     e.preventDefault();
     uploadError = null;
+    isProcessingImage = true;
 
     const files = e.dataTransfer?.files;
     if (!files || files.length === 0) return;
@@ -190,6 +192,7 @@
     const file = files[0];
     if (!file.type.startsWith('image/')) {
       uploadError = 'Please drop an image file';
+      isProcessingImage = false;
       return;
     }
 
@@ -207,15 +210,18 @@
         
         // Validate the board
         validateAllConflicts();
+        isProcessingImage = false;
       }).catch(error => {
         console.error('Error processing image:', error);
         uploadError = 'Error processing image. Please try again.';
         uploadedImageUrl = null;
+        isProcessingImage = false;
       });
     } catch (error) {
       console.error('Error processing image:', error);
       uploadError = 'Error processing image. Please try again.';
       uploadedImageUrl = null;
+      isProcessingImage = false;
     }
   }
 
@@ -342,8 +348,29 @@
           break;
       }
 
+      if (event.shiftKey) {
+        // When shift is held, add all cells between current and new position
+        const minIndex = Math.min(currentIndex, newIndex);
+        const maxIndex = Math.max(currentIndex, newIndex);
+        
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+          // For vertical movement, add cells in the same column
+          const col = currentIndex % 9;
+          for (let i = minIndex; i <= maxIndex; i += 9) {
+            if (i % 9 === col) selectedCells.add(i);
+          }
+        } else {
+          // For horizontal movement, add all cells in between
+          for (let i = minIndex; i <= maxIndex; i++) {
+            selectedCells.add(i);
+          }
+        }
+        selectedCells = selectedCells; // trigger reactivity
+      } else {
+        selectedCells = new Set([newIndex]);
+      }
+      
       selectedIndex = newIndex;
-      selectedCells = new Set([newIndex]);
       validateAllConflicts();
       return;
     }
@@ -501,7 +528,7 @@
     {:else if uploadedImageUrl}
       <div class="image-container">
         <img src={uploadedImageUrl} alt="Uploaded sudoku" />
-        {#if isInitializationMode}
+        {#if isInitializationMode && !isProcessingImage}
           <div class="help-text">
             Make adjustments to the numbers if needed, then click "Play" to start.
           </div>
@@ -544,6 +571,12 @@
               {/if}
             </div>
           {/each}
+          {#if isProcessingImage}
+            <div class="processing-overlay">
+              <div class="spinner"></div>
+              <div class="processing-text">Extracting digits from your puzzle</div>
+            </div>
+          {/if}
         </div>
         {#if isInitializationMode && !uploadedImageUrl}
           <div class="drag-hint">
@@ -971,5 +1004,39 @@
 
   .color-button:hover {
     border-color: #1976d2;
+  }
+
+  .processing-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    border-radius: 8px;
+  }
+
+  .processing-text {
+    margin-top: 1rem;
+    font-size: 1.2rem;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #1976d2;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 </style> 
