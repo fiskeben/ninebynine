@@ -5,6 +5,7 @@
   import Modal from './Modal.svelte';
   import Footer from './Footer.svelte';
   import About from './About.svelte';
+  import Toast from './Toast.svelte';
 
   // Props
   export let isDraggingFile = false;
@@ -25,6 +26,7 @@
   let uploadedImageUrl: string | null = null;
   let shareUrl: string = '';
   let uploadError: string | null = null;
+  let showToast = false;
 
   // Highlighting state
   type HighlightColor = 'red' | 'green' | 'blue';
@@ -278,6 +280,17 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
+    // Handle Tab key for center cell selection
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      if (selectedIndex === null) {
+        selectedIndex = 40;
+        selectedCells = new Set([40]);
+        validateAllConflicts();
+      }
+      return;
+    }
+
     // Handle Space key for mode switching
     if (event.key === ' ') {
       event.preventDefault();
@@ -559,7 +572,10 @@
             <button on:click={undo} disabled={moveHistory.length === 0}>
               Undo
             </button>
-            <button on:click={() => navigator.clipboard.writeText(shareUrl)}>
+            <button on:click={() => {
+              navigator.clipboard.writeText(shareUrl);
+              showToast = true;
+            }}>
               Share
             </button>
             <div class="color-buttons">
@@ -594,6 +610,7 @@
             <li><kbd>Space</kbd> Toggle solution/pencil mode</li>
             <li><kbd>Backspace</kbd> Clear cell</li>
             <li><kbd>U</kbd> Undo</li>
+            <li><kbd>Tab</kbd> Select center cell</li>
             <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Navigate board</li>
           </ul>
         </div>
@@ -601,6 +618,13 @@
     </div>
   </div>
 </div>
+
+{#if showToast}
+  <Toast 
+    message="The link has been copied to your clipboard" 
+    onClose={() => showToast = false}
+  />
+{/if}
 
 <style>
   .container {
