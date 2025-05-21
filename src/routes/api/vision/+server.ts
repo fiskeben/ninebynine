@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { visionClient } from '$lib/server/vision';
+import { getVisionClient } from '$lib/server/vision';
 
 interface Detection {
   text: string;
@@ -23,7 +23,7 @@ export async function POST({ request }) {
     const base64Image = Buffer.from(buffer).toString('base64');
 
     // Perform document text detection
-    const [result] = await visionClient.documentTextDetection({
+    const [result] = await getVisionClient().documentTextDetection({
       image: {
         content: base64Image
       }
