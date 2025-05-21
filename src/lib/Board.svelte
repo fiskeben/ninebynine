@@ -13,7 +13,7 @@
   let pencilMarks = Array(81).fill(null).map(() => new Set<string>());
   let boardElement: HTMLElement;
   let errorCells = new Set<number>();
-  let mode: 'solution' | 'pencil' | 'highlight' = 'solution';
+  let mode: 'solution' | 'pencil' = 'solution';
   let isDragging = false;
   let selectedCells = new Set<number>();
   let dragStartIndex: number | null = null;
@@ -26,7 +26,6 @@
 
   // Highlighting state
   type HighlightColor = 'red' | 'green' | 'blue';
-  let selectedColor: HighlightColor = 'red';
   let highlightedCells: { [key: number]: HighlightColor } = {};
 
   // Move history for undo
@@ -122,22 +121,8 @@
     mode = mode === 'solution' ? 'pencil' : 'solution';
   }
 
-  function toggleHighlight() {
-    mode = mode === 'highlight' ? 'solution' : 'highlight';
-  }
-
   function handleCellClick(index: number, event: MouseEvent) {
     event.stopPropagation();
-    
-    if (mode === 'highlight') {
-      if (highlightedCells[index] === selectedColor) {
-        delete highlightedCells[index];
-      } else {
-        highlightedCells[index] = selectedColor;
-      }
-      highlightedCells = highlightedCells; // trigger reactivity
-      return;
-    }
     
     selectedIndex = index;
     selectedCells = new Set([index]);
@@ -297,7 +282,6 @@
     // Handle M key for mark mode
     if (event.key.toLowerCase() === 'm') {
       event.preventDefault();
-      toggleHighlight();
       return;
     }
 
@@ -453,6 +437,29 @@
       pencilMarks[idx].delete(value);
     }
   }
+
+  function toggleHighlightForSelectedCells(color: HighlightColor | null) {
+    // If clear button is clicked with no selection, clear all highlights
+    if (color === null && selectedCells.size === 0) {
+      highlightedCells = {};
+      return;
+    }
+
+    // Check if any selected cells have this color
+    const hasColor = Array.from(selectedCells).some(index => 
+      color === null ? highlightedCells[index] : highlightedCells[index] === color
+    );
+    
+    // Toggle color for all selected cells
+    selectedCells.forEach(index => {
+      if (hasColor || color === null) {
+        delete highlightedCells[index];
+      } else {
+        highlightedCells[index] = color;
+      }
+    });
+    highlightedCells = highlightedCells; // trigger reactivity
+  }
 </script>
 
 <svelte:window 
@@ -462,13 +469,6 @@
 />
 
 <div class="container">
-  <header class="game-header">
-    <h1>
-      <span class="nine">nine</span>
-      <span class="by">by</span>
-      <span class="nine">nine</span>
-    </h1>
-  </header>
   <div class="game-area">
     {#if uploadError}
       <div 
@@ -558,37 +558,34 @@
           <button on:click={toggleMode}>
             Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
           </button>
-          <button on:click={toggleHighlight} class:active={mode === 'highlight'}>
-            Mark cell
-          </button>
           <button on:click={undo} disabled={moveHistory.length === 0}>
             Undo
           </button>
           <button on:click={() => navigator.clipboard.writeText(shareUrl)}>
             Share
           </button>
-          {#if mode === 'highlight'}
-            <div class="color-buttons">
-              <button 
-                class="color-button" 
-                class:selected={selectedColor === 'red'}
-                style="background-color: #ffcdd2" 
-                on:click={() => selectedColor = 'red'}
-              ></button>
-              <button 
-                class="color-button" 
-                class:selected={selectedColor === 'green'}
-                style="background-color: #c8e6c9" 
-                on:click={() => selectedColor = 'green'}
-              ></button>
-              <button 
-                class="color-button" 
-                class:selected={selectedColor === 'blue'}
-                style="background-color: #bbdefb" 
-                on:click={() => selectedColor = 'blue'}
-              ></button>
-            </div>
-          {/if}
+          <div class="color-buttons">
+            <button 
+              class="color-button" 
+              style="background-color: #ffcdd2" 
+              on:click={() => toggleHighlightForSelectedCells('red')}
+            ></button>
+            <button 
+              class="color-button" 
+              style="background-color: #c8e6c9" 
+              on:click={() => toggleHighlightForSelectedCells('green')}
+            ></button>
+            <button 
+              class="color-button" 
+              style="background-color: #fff3c4" 
+              on:click={() => toggleHighlightForSelectedCells('blue')}
+            ></button>
+            <button 
+              class="color-button clear" 
+              style="background-color: white" 
+              on:click={() => toggleHighlightForSelectedCells(null)}
+            ></button>
+          </div>
         {/if}
       </div>
 
@@ -597,7 +594,6 @@
         <ul>
           <li><kbd>1-9</kbd> Enter number</li>
           <li><kbd>Space</kbd> Toggle solution/pencil mode</li>
-          <li><kbd>M</kbd> Toggle mark mode</li>
           <li><kbd>Backspace</kbd> Clear cell</li>
           <li><kbd>U</kbd> Undo</li>
           <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Navigate board</li>
@@ -613,39 +609,6 @@
     max-width: 1200px;
     margin: 0 auto;
     padding: 1rem;
-  }
-
-  .game-header {
-    text-align: center;
-    margin-bottom: 2rem;
-    padding: 1rem;
-  }
-
-  .game-header h1 {
-    font-size: 3.5rem;
-    font-weight: 900;
-    letter-spacing: -1px;
-    color: #1976d2;
-    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
-    animation: fadeIn 0.8s ease-out;
-  }
-
-  .game-header .nine {
-    display: inline-block;
-    position: relative;
-  }
-
-  .game-header .by {
-    font-size: 2.5rem;
-    color: #666;
-    margin: 0 1rem;
-    font-style: italic;
-    font-weight: 300;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
   }
 
   .game-area {
@@ -803,7 +766,7 @@
   }
 
   .cell[data-highlight="blue"] {
-    background-color: #bbdefb;
+    background-color: #fff3c4;
   }
 
   .cell[data-highlight] {
@@ -965,14 +928,14 @@
     border: 2px solid transparent;
     border-radius: 4px;
     cursor: pointer;
+    padding: 0;
   }
 
-  .color-button.selected {
-    border-color: #1976d2;
+  .color-button.clear {
+    border-color: #ccc;
   }
 
-  button.active {
-    background-color: #e3f2fd;
+  .color-button:hover {
     border-color: #1976d2;
   }
 </style> 

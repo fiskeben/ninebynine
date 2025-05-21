@@ -12,10 +12,16 @@
 
 <style>
   .footer {
-    margin-top: 2rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    margin-top: 0;
     padding: 1rem;
     border-top: 1px solid #eee;
     text-align: center;
+    z-index: 10;
   }
 
   .footer-content {
