@@ -3,9 +3,6 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [sveltekit()],
-	ssr: {
-		noExternal: ['@google-cloud/vision']
-	},
 	build: {
 		rollupOptions: {
 			external: ['@google-cloud/vision']
