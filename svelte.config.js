@@ -7,7 +7,6 @@ export default {
 		adapter: adapter({
 			runtime: 'nodejs18',
 			regions: ['fra1'], // optional: specify deployment region
-			edge: false // disable edge runtime since we're using Google Cloud Vision
 		})
 	},
 	preprocess: vitePreprocess()
