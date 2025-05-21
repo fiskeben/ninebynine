@@ -497,7 +497,7 @@
     {/if}
     
     <div class="play-area">
-      <div>
+      <div class="board-container">
         <div 
           class="board"
           class:dragging={isDraggingFile}
@@ -540,64 +540,64 @@
         {/if}
       </div>
 
-      <div>
-      <div class="controls">
-        {#if !isInitializationMode}
-          <button on:click={startNewGame}>
-            New board
-          </button>
-        {/if}
-        {#if isInitializationMode}
-          <button on:click={finishInitialization} class="primary-button">
-            Play!
-          </button>
-        {/if}
-        {#if !isInitializationMode}
-          <button on:click={toggleMode}>
-            Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
-          </button>
-          <button on:click={undo} disabled={moveHistory.length === 0}>
-            Undo
-          </button>
-          <button on:click={() => navigator.clipboard.writeText(shareUrl)}>
-            Share
-          </button>
-          <div class="color-buttons">
-            <button 
-              class="color-button" 
-              style="background-color: #ffcdd2" 
-              on:click={() => toggleHighlightForSelectedCells('red')}
-            ></button>
-            <button 
-              class="color-button" 
-              style="background-color: #c8e6c9" 
-              on:click={() => toggleHighlightForSelectedCells('green')}
-            ></button>
-            <button 
-              class="color-button" 
-              style="background-color: #fff3c4" 
-              on:click={() => toggleHighlightForSelectedCells('blue')}
-            ></button>
-            <button 
-              class="color-button clear" 
-              style="background-color: white" 
-              on:click={() => toggleHighlightForSelectedCells(null)}
-            ></button>
-          </div>
-        {/if}
-      </div>
+      <div class="controls-container">
+        <div class="controls">
+          {#if !isInitializationMode}
+            <button on:click={startNewGame}>
+              New board
+            </button>
+          {/if}
+          {#if isInitializationMode}
+            <button on:click={finishInitialization} class="primary-button">
+              Play!
+            </button>
+          {/if}
+          {#if !isInitializationMode}
+            <button on:click={toggleMode}>
+              Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
+            </button>
+            <button on:click={undo} disabled={moveHistory.length === 0}>
+              Undo
+            </button>
+            <button on:click={() => navigator.clipboard.writeText(shareUrl)}>
+              Share
+            </button>
+            <div class="color-buttons">
+              <button 
+                class="color-button" 
+                style="background-color: #ffcdd2" 
+                on:click={() => toggleHighlightForSelectedCells('red')}
+              ></button>
+              <button 
+                class="color-button" 
+                style="background-color: #c8e6c9" 
+                on:click={() => toggleHighlightForSelectedCells('green')}
+              ></button>
+              <button 
+                class="color-button" 
+                style="background-color: #fff3c4" 
+                on:click={() => toggleHighlightForSelectedCells('blue')}
+              ></button>
+              <button 
+                class="color-button clear" 
+                style="background-color: white" 
+                on:click={() => toggleHighlightForSelectedCells(null)}
+              ></button>
+            </div>
+          {/if}
+        </div>
 
-      <div class="shortcuts-info">
-        <h3>Keyboard Shortcuts</h3>
-        <ul>
-          <li><kbd>1-9</kbd> Enter number</li>
-          <li><kbd>Space</kbd> Toggle solution/pencil mode</li>
-          <li><kbd>Backspace</kbd> Clear cell</li>
-          <li><kbd>U</kbd> Undo</li>
-          <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Navigate board</li>
-        </ul>
+        <div class="shortcuts-info">
+          <h3>Keyboard Shortcuts</h3>
+          <ul>
+            <li><kbd>1-9</kbd> Enter number</li>
+            <li><kbd>Space</kbd> Toggle solution/pencil mode</li>
+            <li><kbd>Backspace</kbd> Clear cell</li>
+            <li><kbd>U</kbd> Undo</li>
+            <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Navigate board</li>
+          </ul>
+        </div>
       </div>
-    </div>
     </div>
   </div>
 </div>
@@ -606,7 +606,8 @@
   .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1rem;
+    padding: 0 1rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
 
   .game-area {
@@ -614,11 +615,11 @@
     gap: 2rem;
     align-items: flex-start;
     position: relative;
-    min-height: min(90vw, 500px);
+    min-height: min(calc(60vh - 160px), 60vw);
   }
 
   .image-container {
-    width: min(90vw, 500px);
+    width: min(calc(90vh - 160px), 90vw, 500px);
     aspect-ratio: 1;
     position: relative;
     flex: 0 0 auto;
@@ -640,12 +641,22 @@
     border-radius: 8px;
     font-size: 0.9rem;
     color: #333;
+    font-family: inherit;
   }
 
   .play-area {
     display: flex;
     gap: 2rem;
     align-items: flex-start;
+    flex: 1;
+  }
+
+  .board-container {
+    flex: 1;
+    max-width: min(calc(90vh - 160px), 90vw, 500px);
+  }
+
+  .controls-container {
     flex: 0 0 auto;
   }
 
@@ -653,7 +664,6 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
-    flex: 0 0 auto;
     width: max-content;
   }
 
@@ -666,6 +676,7 @@
     cursor: pointer;
     white-space: nowrap;
     width: 200px;
+    font-family: inherit;
   }
 
   button:hover {
@@ -678,13 +689,11 @@
     gap: 2px;
     background-color: #666;
     padding: 2px 6px 2px 2px;
-    width: min(90vw, 500px);
+    width: 100%;
     aspect-ratio: 1;
     border: 2px solid #666;
     box-sizing: border-box;
     position: relative;
-    flex: 0 0 auto;
-    transform: none;
   }
 
   .board.with-image {
@@ -701,10 +710,11 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: min(1.5rem, 4vw);
     user-select: none;
     cursor: pointer;
     position: relative;
+    font-family: inherit;
   }
 
   /* Add thicker borders for 3x3 groups */
@@ -764,7 +774,7 @@
   }
 
   .has-pencil-marks {
-    font-size: 0.7rem;
+    font-size: min(0.7rem, 1.5vw);
   }
 
   .pencil-marks {
@@ -788,14 +798,38 @@
     font-weight: bold;
   }
 
-  @media (max-width: 1600px) {
+  @media (max-width: 900px) {
     .game-area {
-      flex-wrap: wrap;
+      flex-direction: column;
+      align-items: center;
     }
-    
+
     .play-area {
+      flex-direction: column;
+      align-items: center;
       width: 100%;
-      justify-content: flex-start;
+    }
+
+    .board-container {
+      width: 100%;
+    }
+
+    .controls {
+      width: 100%;
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    button {
+      width: auto;
+      min-width: 120px;
+    }
+
+    .shortcuts-info {
+      width: 100%;
+      max-width: 500px;
+      margin: 1rem auto;
     }
   }
 
@@ -854,6 +888,7 @@
     color: #666;
     font-size: 0.9rem;
     animation: fadeIn 0.3s ease-out;
+    font-family: inherit;
   }
 
   .shortcuts-info {
@@ -867,6 +902,7 @@
   .shortcuts-info h3 {
     margin: 0 0 0.5rem 0;
     color: #333;
+    font-family: inherit;
   }
 
   .shortcuts-info ul {
