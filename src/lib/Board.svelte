@@ -10,7 +10,7 @@
   let pencilMarks = Array(81).fill(null).map(() => new Set<string>());
   let boardElement: HTMLElement;
   let errorCells = new Set<number>();
-  let mode: 'solution' | 'pencil' = 'solution';
+  let mode: 'solution' | 'pencil' | 'highlight' = 'solution';
   let isDragging = false;
   let selectedCells = new Set<number>();
   let dragStartIndex: number | null = null;
@@ -20,6 +20,11 @@
   let uploadedImageUrl: string | null = null;
   let shareUrl: string = '';
   let uploadError: string | null = null;
+
+  // Highlighting state
+  type HighlightColor = 'red' | 'green' | 'blue';
+  let selectedColor: HighlightColor = 'red';
+  let highlightedCells: { [key: number]: HighlightColor } = {};
 
   // Move history for undo
   type Move = {
@@ -112,8 +117,23 @@
     mode = mode === 'solution' ? 'pencil' : 'solution';
   }
 
+  function toggleHighlight() {
+    mode = mode === 'highlight' ? 'solution' : 'highlight';
+  }
+
   function handleCellClick(index: number, event: MouseEvent) {
     event.stopPropagation();
+    
+    if (mode === 'highlight') {
+      if (highlightedCells[index] === selectedColor) {
+        delete highlightedCells[index];
+      } else {
+        highlightedCells[index] = selectedColor;
+      }
+      highlightedCells = highlightedCells; // trigger reactivity
+      return;
+    }
+    
     selectedIndex = index;
     selectedCells = new Set([index]);
     validateAllConflicts();
@@ -485,6 +505,7 @@
               class:matching-digit={hasMatchingDigit(i)}
               class:locked={lockedCells.has(i)}
               data-index={i}
+              data-highlight={highlightedCells[i] || null}
               on:click={(e) => handleCellClick(i, e)}
               on:mousedown={(e) => handleCellMouseDown(i, e)}
               on:mouseenter={() => handleCellMouseEnter(i)}
@@ -525,12 +546,37 @@
           <button on:click={toggleMode}>
             Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
           </button>
+          <button on:click={toggleHighlight} class:active={mode === 'highlight'}>
+            Mark cell
+          </button>
           <button on:click={undo} disabled={moveHistory.length === 0}>
             Undo
           </button>
           <button on:click={() => navigator.clipboard.writeText(shareUrl)}>
             Share
           </button>
+          {#if mode === 'highlight'}
+            <div class="color-buttons">
+              <button 
+                class="color-button" 
+                class:selected={selectedColor === 'red'}
+                style="background-color: #ffcdd2" 
+                on:click={() => selectedColor = 'red'}
+              ></button>
+              <button 
+                class="color-button" 
+                class:selected={selectedColor === 'green'}
+                style="background-color: #c8e6c9" 
+                on:click={() => selectedColor = 'green'}
+              ></button>
+              <button 
+                class="color-button" 
+                class:selected={selectedColor === 'blue'}
+                style="background-color: #bbdefb" 
+                on:click={() => selectedColor = 'blue'}
+              ></button>
+            </div>
+          {/if}
         {/if}
       </div>
 
@@ -538,7 +584,7 @@
         <h3>Keyboard Shortcuts</h3>
         <ul>
           <li><kbd>1-9</kbd> Enter number</li>
-          <li><kbd>Space</kbd> Toggle pencil/solution mode</li>
+          <li><kbd>Space</kbd> Toggle solution/pencil mode</li>
           <li><kbd>Backspace</kbd> Clear cell</li>
           <li><kbd>U</kbd> Undo</li>
           <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Navigate board</li>
@@ -735,6 +781,26 @@
     background-color: #fff3e0;
   }
 
+  .cell[data-highlight="red"] {
+    background-color: #ffcdd2;
+  }
+
+  .cell[data-highlight="green"] {
+    background-color: #c8e6c9;
+  }
+
+  .cell[data-highlight="blue"] {
+    background-color: #bbdefb;
+  }
+
+  .cell[data-highlight] {
+    opacity: 0.8;
+  }
+
+  .cell[data-highlight]:hover {
+    opacity: 1;
+  }
+
   .has-pencil-marks {
     font-size: 0.7rem;
   }
@@ -873,5 +939,27 @@
     padding: 0.1rem 0.4rem;
     font-size: 0.8rem;
     font-family: monospace;
+  }
+
+  .color-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .color-button {
+    width: 20px;
+    height: 20px;
+    border: 2px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .color-button.selected {
+    border-color: #1976d2;
+  }
+
+  button.active {
+    background-color: #e3f2fd;
+    border-color: #1976d2;
   }
 </style> 
