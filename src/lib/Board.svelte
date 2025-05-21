@@ -2,6 +2,9 @@
   import { processImage } from './processImage';
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import Modal from './Modal.svelte';
+  import Footer from './Footer.svelte';
+  import About from './About.svelte';
 
   // Create a 9x9 grid of cells
   const cells = Array(81).fill(null);
@@ -35,6 +38,8 @@
     newPencilMarks: Set<string>[];
   };
   let moveHistory: Move[] = [];
+
+  let isAboutModalOpen = false;
 
   function recordMove(cells: number[], oldValues: string[], newValues: string[], oldPencilMarks: Set<string>[], newPencilMarks: Set<string>[]) {
     moveHistory.push({ cells, oldValues, newValues, oldPencilMarks, newPencilMarks });
@@ -286,6 +291,13 @@
     if (event.key === ' ') {
       event.preventDefault();
       toggleMode();
+      return;
+    }
+
+    // Handle M key for mark mode
+    if (event.key.toLowerCase() === 'm') {
+      event.preventDefault();
+      toggleHighlight();
       return;
     }
 
@@ -585,6 +597,7 @@
         <ul>
           <li><kbd>1-9</kbd> Enter number</li>
           <li><kbd>Space</kbd> Toggle solution/pencil mode</li>
+          <li><kbd>M</kbd> Toggle mark mode</li>
           <li><kbd>Backspace</kbd> Clear cell</li>
           <li><kbd>U</kbd> Undo</li>
           <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> Navigate board</li>
