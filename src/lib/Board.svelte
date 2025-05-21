@@ -1,5 +1,7 @@
 <script lang="ts">
   import { processImage } from './processImage';
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
 
   // Create a 9x9 grid of cells
   const cells = Array(81).fill(null);
@@ -15,6 +17,38 @@
   let isInitializationMode = false;
   let lockedCells = new Set<number>();
   let isDraggingFile = false;
+  let uploadedImageUrl: string | null = null;
+  let shareUrl: string = '';
+
+  onMount(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const board = searchParams.get('board');
+    if (board) {
+      values = Array(81).fill('');
+      board.split(';').forEach(coord => {
+        if (!coord) return;
+        const [pos, val] = coord.split(':');
+        const [x, y] = pos.split(',').map(Number);
+        if (x >= 0 && x < 9 && y >= 0 && y < 9) {
+          values[y * 9 + x] = val;
+        }
+      });
+      isInitializationMode = true;
+      finishInitialization();
+    }
+    updateShareUrl();
+  });
+
+  function updateShareUrl() {
+    const coords = values
+      .map((v, i) => v ? `${i % 9},${Math.floor(i / 9)}:${v}` : null)
+      .filter(Boolean)
+      .join(';');
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('board', coords);
+    shareUrl = url.toString();
+  }
 
   function startNewGame() {
     values = Array(81).fill('');
@@ -25,6 +59,7 @@
     lockedCells.clear();
     isInitializationMode = true;
     mode = 'solution';
+    updateShareUrl();
   }
 
   function finishInitialization() {
@@ -36,6 +71,8 @@
         }
       });
       isInitializationMode = false;
+      uploadedImageUrl = null;
+      updateShareUrl();
     }
   }
 
@@ -106,6 +143,9 @@
     }
 
     try {
+      // Create URL for the dropped image
+      uploadedImageUrl = URL.createObjectURL(file);
+      
       // Process image with Google Cloud Vision
       const grid = await processImage(file);
       
@@ -184,7 +224,63 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (selectedCells.size === 0) return;
+    // Handle Tab key for mode switching
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      toggleMode();
+      return;
+    }
+
+    if (selectedCells.size === 0) {
+      // If no cell is selected and arrow key is pressed, select cell 0
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        selectedIndex = 0;
+        selectedCells = new Set([0]);
+        return;
+      }
+      return;
+    }
+
+    // Handle arrow key navigation
+    if (event.key.startsWith('Arrow')) {
+      event.preventDefault();
+      const currentIndex = selectedIndex ?? 0;
+      let newIndex = currentIndex;
+
+      switch (event.key) {
+        case 'ArrowUp':
+          newIndex = Math.max(0, currentIndex - 9);
+          break;
+        case 'ArrowDown':
+          newIndex = Math.min(80, currentIndex + 9);
+          break;
+        case 'ArrowLeft':
+          newIndex = Math.max(0, currentIndex - 1);
+          break;
+        case 'ArrowRight':
+          newIndex = Math.min(80, currentIndex + 1);
+          break;
+      }
+
+      selectedIndex = newIndex;
+      selectedCells = new Set([newIndex]);
+      validateAllConflicts();
+      return;
+    }
+    
+    if (event.key === ' ' || event.key === 'Backspace') {
+      for (const index of selectedCells) {
+        // Don't modify locked cells unless in initialization mode
+        if (lockedCells.has(index) && !isInitializationMode) continue;
+        
+        values[index] = '';
+        pencilMarks[index] = new Set<string>();
+      }
+      values = [...values]; // trigger reactivity
+      pencilMarks = [...pencilMarks]; // trigger reactivity
+      validateAllConflicts();
+      return;
+    }
     
     const num = parseInt(event.key);
     if (num >= 1 && num <= 9) {
@@ -241,6 +337,15 @@
     ]);
     return indices.has(index) && pencilMarks[index].has(selectedValue);
   }
+
+  function hasMatchingDigit(index: number): boolean {
+    if (selectedIndex === null) return false;
+    const selectedValue = values[selectedIndex];
+    if (!selectedValue) return false;
+    
+    // Check both regular values and pencil marks
+    return values[index] === selectedValue || pencilMarks[index].has(selectedValue);
+  }
 </script>
 
 <svelte:window 
@@ -249,61 +354,207 @@
   on:mouseup={handleWindowMouseUp}
 />
 
-<div class="controls">
-  <button on:click={startNewGame}>
-    New Game
-  </button>
-  {#if isInitializationMode}
-    <button on:click={finishInitialization}>
-      Done Setting Up
-    </button>
-  {/if}
-  <button on:click={toggleMode}>
-    Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
-  </button>
-</div>
+<div class="container">
+  <header class="game-header">
+    <h1>
+      <span class="nine">nine</span>
+      <span class="by">by</span>
+      <span class="nine">nine</span>
+    </h1>
+  </header>
+  <div class="game-area">
+    {#if uploadedImageUrl}
+      <div class="image-container">
+        <img src={uploadedImageUrl} alt="Uploaded sudoku" />
+        {#if isInitializationMode}
+          <div class="image-overlay">
+            Make adjustments to the numbers if needed, then click "Lock Board & Start Playing"
+          </div>
+        {/if}
+      </div>
+    {/if}
+    
+    <div class="play-area">
+      <div 
+        class="board"
+        class:dragging={isDraggingFile}
+        class:with-image={uploadedImageUrl}
+        bind:this={boardElement}
+        on:dragenter={handleDragEnter}
+        on:dragleave={handleDragLeave}
+        on:dragover={handleDragOver}
+        on:drop={handleDrop}
+      >
+        {#each cells as cell, i}
+          <div 
+            class="cell" 
+            class:selected={selectedCells.has(i)}
+            class:highlighted={isInSelectedRowOrCol(i)}
+            class:error={errorCells.has(i)}
+            class:has-pencil-marks={!values[i] && pencilMarks[i].size > 0}
+            class:matching-pencil={hasMatchingPencilMark(i)}
+            class:matching-digit={hasMatchingDigit(i)}
+            class:locked={lockedCells.has(i)}
+            data-index={i}
+            on:click={(e) => handleCellClick(i, e)}
+            on:mousedown={(e) => handleCellMouseDown(i, e)}
+            on:mouseenter={() => handleCellMouseEnter(i)}
+          >
+            {#if values[i]}
+              {values[i]}
+            {:else if pencilMarks[i].size > 0}
+              <div class="pencil-marks">
+                {#each formatPencilMarks(pencilMarks[i]) as mark}
+                  <div class="pencil-mark">{mark}</div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
 
-<div 
-  class="board"
-  class:dragging={isDraggingFile}
-  bind:this={boardElement}
-  on:dragenter={handleDragEnter}
-  on:dragleave={handleDragLeave}
-  on:dragover={handleDragOver}
-  on:drop={handleDrop}
->
-  {#each cells as cell, i}
-    <div 
-      class="cell" 
-      class:selected={selectedCells.has(i)}
-      class:highlighted={isInSelectedRowOrCol(i)}
-      class:error={errorCells.has(i)}
-      class:has-pencil-marks={!values[i] && pencilMarks[i].size > 0}
-      class:matching-pencil={hasMatchingPencilMark(i)}
-      class:locked={lockedCells.has(i)}
-      data-index={i}
-      on:click={(e) => handleCellClick(i, e)}
-      on:mousedown={(e) => handleCellMouseDown(i, e)}
-      on:mouseenter={() => handleCellMouseEnter(i)}
-    >
-      {#if values[i]}
-        {values[i]}
-      {:else if pencilMarks[i].size > 0}
-        <div class="pencil-marks">
-          {#each formatPencilMarks(pencilMarks[i]) as mark}
-            <div class="pencil-mark">{mark}</div>
-          {/each}
-        </div>
-      {/if}
+      <div class="controls">
+        <button on:click={startNewGame}>
+          New Game
+        </button>
+        {#if isInitializationMode}
+          <button on:click={finishInitialization} class="primary-button">
+            Lock Board & Start Playing
+          </button>
+        {/if}
+        <button on:click={toggleMode}>
+          Mode: {mode === 'solution' ? 'Solution' : 'Pencil'}
+        </button>
+        {#if !isInitializationMode}
+          <button on:click={() => navigator.clipboard.writeText(shareUrl)}>
+            Share
+          </button>
+        {/if}
+      </div>
     </div>
-  {/each}
+  </div>
 </div>
 
 <style>
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1rem;
+  }
+
+  .game-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+  }
+
+  .game-header h1 {
+    font-size: 3.5rem;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: #1976d2;
+    text-shadow: 2px 2px 0px rgba(0,0,0,0.1);
+    animation: fadeIn 0.8s ease-out;
+  }
+
+  .game-header .nine {
+    display: inline-block;
+    position: relative;
+  }
+
+  .game-header .by {
+    font-size: 2.5rem;
+    color: #666;
+    margin: 0 1rem;
+    font-style: italic;
+    font-weight: 300;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .game-area {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    position: relative;
+    min-height: min(90vw, 500px);
+  }
+
+  .image-container {
+    width: min(90vw, 500px);
+    aspect-ratio: 1;
+    position: relative;
+    flex: 0 0 auto;
+  }
+
+  .image-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: #f5f5f5;
+  }
+
+  .image-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 1rem;
+    font-size: 0.9rem;
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateX(-20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-20px); }
+  }
+
+  @keyframes slideRight {
+    from { transform: translateX(0); }
+    to { transform: translateX(calc(100% + 2rem)); }
+  }
+
+  @keyframes slideCenter {
+    from { transform: translateX(calc(100% + 2rem)); }
+    to { transform: translateX(0); }
+  }
+
+  .primary-button {
+    background: #1976d2;
+    color: white;
+    font-weight: bold;
+  }
+
+  .primary-button:hover {
+    background: #1565c0;
+  }
+
+  .play-area {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    flex: 0 0 auto;
+  }
+
   .controls {
     display: flex;
+    flex-direction: column;
     gap: 1rem;
-    margin-bottom: 1rem;
+    flex: 0 0 auto;
+    width: max-content;
   }
 
   button {
@@ -313,6 +564,7 @@
     border-radius: 4px;
     background: white;
     cursor: pointer;
+    white-space: nowrap;
   }
 
   button:hover {
@@ -324,12 +576,18 @@
     grid-template-columns: repeat(9, 1fr);
     gap: 2px;
     background-color: #666;
-    padding: 2px;
+    padding: 2px 6px 2px 2px;
     width: min(90vw, 500px);
     aspect-ratio: 1;
     border: 2px solid #666;
     box-sizing: border-box;
     position: relative;
+    flex: 0 0 auto;
+    transform: none;
+  }
+
+  .board.with-image {
+    transform: none;
   }
 
   .board.dragging::after {
@@ -387,6 +645,10 @@
     background-color: #ffebee;
   }
 
+  .cell.matching-digit {
+    background-color: #fff3e0;
+  }
+
   .cell.matching-pencil {
     background-color: #fff3e0;
   }
@@ -414,5 +676,16 @@
   .cell.locked {
     color: #1976d2;
     font-weight: bold;
+  }
+
+  @media (max-width: 1600px) {
+    .game-area {
+      flex-wrap: wrap;
+    }
+    
+    .play-area {
+      width: 100%;
+      justify-content: flex-start;
+    }
   }
 </style> 
