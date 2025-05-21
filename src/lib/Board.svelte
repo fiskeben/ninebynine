@@ -6,6 +6,9 @@
   import Footer from './Footer.svelte';
   import About from './About.svelte';
 
+  // Props
+  export let isDraggingFile = false;
+
   // Create a 9x9 grid of cells
   const cells = Array(81).fill(null);
   let selectedIndex: number | null = null;
@@ -19,7 +22,6 @@
   let dragStartIndex: number | null = null;
   let isInitializationMode = false;
   let lockedCells = new Set<number>();
-  let isDraggingFile = false;
   let uploadedImageUrl: string | null = null;
   let shareUrl: string = '';
   let uploadError: string | null = null;
@@ -174,10 +176,10 @@
     e.preventDefault();
   }
 
-  async function handleDrop(e: DragEvent) {
+  // Expose handleDrop for the parent component
+  export function handleDrop(e: DragEvent) {
     if (!isInitializationMode) return;
     e.preventDefault();
-    isDraggingFile = false;
     uploadError = null;
 
     const files = e.dataTransfer?.files;
@@ -194,16 +196,20 @@
       uploadedImageUrl = URL.createObjectURL(file);
       
       // Process image with Google Cloud Vision
-      const grid = await processImage(file);
-      
-      // Update the board with the extracted numbers
-      values = grid.flat().map(val => val || '');
-      
-      // Set initialization mode to allow editing
-      isInitializationMode = true;
-      
-      // Validate the board
-      validateAllConflicts();
+      processImage(file).then(grid => {
+        // Update the board with the extracted numbers
+        values = grid.flat().map(val => val || '');
+        
+        // Set initialization mode to allow editing
+        isInitializationMode = true;
+        
+        // Validate the board
+        validateAllConflicts();
+      }).catch(error => {
+        console.error('Error processing image:', error);
+        uploadError = 'Error processing image. Please try again.';
+        uploadedImageUrl = null;
+      });
     } catch (error) {
       console.error('Error processing image:', error);
       uploadError = 'Error processing image. Please try again.';
@@ -474,10 +480,6 @@
       <div 
         class="image-container error"
         class:dragging={isDraggingFile}
-        on:dragenter={handleDragEnter}
-        on:dragleave={handleDragLeave}
-        on:dragover={handleDragOver}
-        on:drop={handleDrop}
       >
         <div class="error-message">
           {uploadError}
@@ -501,10 +503,6 @@
           class:dragging={isDraggingFile}
           class:with-image={uploadedImageUrl}
           bind:this={boardElement}
-          on:dragenter={handleDragEnter}
-          on:dragleave={handleDragLeave}
-          on:dragover={handleDragOver}
-          on:drop={handleDrop}
         >
           {#each cells as cell, i}
             <div 
@@ -694,19 +692,7 @@
   }
 
   .board.dragging::after {
-    content: "Drop image here";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    z-index: 10;
+    content: none;
   }
 
   .cell {
@@ -852,19 +838,7 @@
   }
 
   .image-container.error.dragging::after {
-    content: "Drop image here";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    z-index: 10;
+    content: none;
   }
 
   .error-message {
