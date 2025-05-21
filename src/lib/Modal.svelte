@@ -70,6 +70,8 @@
     margin: 0;
     font-size: 1.5rem;
     color: #333;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-weight: 900;
   }
 
   .modal-body {
