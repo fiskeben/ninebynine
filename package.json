@@ -23,6 +23,7 @@
 		"svelte-check": "^4.0.0",
 		"tailwindcss": "^4.1.7",
 		"typescript": "^5.0.0",
-		"vite": "^6.2.6"
+		"vite": "^6.2.6",
+		"@google-cloud/vision": "^5.1.0"
 	}
 }
