@@ -743,9 +743,9 @@
   .board {
     display: grid;
     grid-template-columns: repeat(9, 1fr);
-    gap: 2px;
+    gap: 1px;
     background-color: #666;
-    padding: 2px 6px 2px 2px;
+    padding: 2px;
     width: 100%;
     aspect-ratio: 1;
     border: 2px solid #666;
@@ -775,14 +775,38 @@
   }
 
   /* Add thicker borders for 3x3 groups */
-  .cell:nth-child(9n + 4),
-  .cell:nth-child(9n + 7) {
-    margin-left: 2px;
+  .cell:nth-child(9n + 3),
+  .cell:nth-child(9n + 6) {
+    position: relative;
+  }
+  
+  .cell:nth-child(9n + 3)::after,
+  .cell:nth-child(9n + 6)::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -2px;
+    width: 3px;
+    height: 100%;
+    background-color: #333;
+    z-index: 1;
   }
 
-  .cell:nth-child(n + 28):nth-child(-n + 36),
-  .cell:nth-child(n + 55):nth-child(-n + 63) {
-    margin-top: 2px;
+  .cell:nth-child(n + 19):nth-child(-n + 27),
+  .cell:nth-child(n + 46):nth-child(-n + 54) {
+    position: relative;
+  }
+  
+  .cell:nth-child(n + 19):nth-child(-n + 27)::before,
+  .cell:nth-child(n + 46):nth-child(-n + 54)::before {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background-color: #333;
+    z-index: 1;
   }
 
   .cell:hover {
