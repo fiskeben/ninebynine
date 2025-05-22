@@ -506,6 +506,77 @@
     });
     highlightedCells = highlightedCells; // trigger reactivity
   }
+
+  function handleMobileInput(key: string) {
+    // Simulate keyboard event for mobile buttons
+    const event = { key } as KeyboardEvent;
+    
+    if (key === 'Backspace') {
+      const oldValues = Array.from(selectedCells).map(index => values[index]);
+      const oldPencilMarks = Array.from(selectedCells).map(index => new Set(pencilMarks[index]));
+      
+      for (const index of selectedCells) {
+        // Don't modify locked cells unless in initialization mode
+        if (lockedCells.has(index) && !isInitializationMode) continue;
+        
+        values[index] = '';
+        pencilMarks[index] = new Set<string>();
+      }
+      
+      const newValues = Array.from(selectedCells).map(index => values[index]);
+      const newPencilMarks = Array.from(selectedCells).map(index => new Set(pencilMarks[index]));
+      
+      recordMove(Array.from(selectedCells), oldValues, newValues, oldPencilMarks, newPencilMarks);
+      values = [...values]; // trigger reactivity
+      pencilMarks = [...pencilMarks]; // trigger reactivity
+      validateAllConflicts();
+      return;
+    }
+    
+    const num = parseInt(key);
+    if (num >= 1 && num <= 9) {
+      // If no cell is selected, select center cell
+      if (selectedCells.size === 0) {
+        selectedIndex = 40;
+        selectedCells = new Set([40]);
+      }
+      
+      const useForcesPencilMode = selectedCells.size > 1;
+      const oldValues = Array.from(selectedCells).map(index => values[index]);
+      const oldPencilMarks = Array.from(selectedCells).map(index => new Set(pencilMarks[index]));
+      
+      for (const index of selectedCells) {
+        // Don't modify locked cells unless in initialization mode
+        if (lockedCells.has(index) && !isInitializationMode) continue;
+
+        if (!useForcesPencilMode && mode === 'solution') {
+          // Clear pencil marks when entering a value
+          pencilMarks[index] = new Set<string>();
+          values[index] = key;
+          // Remove invalidated pencil marks
+          removePencilMarksForValue(index, key);
+        } else {
+          // Don't allow pencil marks if cell has a value
+          if (values[index]) continue;
+          
+          const marks = pencilMarks[index];
+          if (marks.has(key)) {
+            marks.delete(key);
+          } else {
+            marks.add(key);
+          }
+        }
+      }
+      
+      const newValues = Array.from(selectedCells).map(index => values[index]);
+      const newPencilMarks = Array.from(selectedCells).map(index => new Set(pencilMarks[index]));
+      
+      recordMove(Array.from(selectedCells), oldValues, newValues, oldPencilMarks, newPencilMarks);
+      values = [...values]; // trigger reactivity
+      pencilMarks = [...pencilMarks]; // trigger reactivity
+      validateAllConflicts();
+    }
+  }
 </script>
 
 <svelte:window 
@@ -584,6 +655,24 @@
             <p>or add the numbers manually and then click "Play" to start.</p>
           </div>
         {/if}
+      </div>
+
+      <!-- Mobile input buttons -->
+      <div class="mobile-input">
+        {#each Array(9) as _, i}
+          <button 
+            class="mobile-number-btn"
+            on:click={() => handleMobileInput((i + 1).toString())}
+          >
+            {i + 1}
+          </button>
+        {/each}
+        <button 
+          class="mobile-number-btn mobile-delete-btn"
+          on:click={() => handleMobileInput('Backspace')}
+        >
+          ×
+        </button>
       </div>
 
       <div class="controls-container">
@@ -900,17 +989,18 @@
       flex-direction: row;
       flex-wrap: wrap;
       justify-content: center;
+      gap: 0.5rem;
     }
 
     button {
       width: auto;
-      min-width: 120px;
+      min-width: 60px;
+      padding: 0.3rem 0.6rem;
+      font-size: 0.8rem;
     }
 
     .shortcuts-info {
-      width: 100%;
-      max-width: 500px;
-      margin: 1rem auto;
+      display: none;
     }
   }
 
@@ -1062,5 +1152,71 @@
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+
+  .mobile-input {
+    display: none;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+    margin-top: 0;
+    padding: 0.1rem;
+    background: #f5f5f5;
+    border-radius: 8px;
+    width: 100%;
+    max-width: min(calc(90vh - 160px), 90vw, 500px);
+  }
+
+  .mobile-number-btn {
+    font-size: 1.1rem;
+    font-weight: bold;
+    border: 1px solid #1976d2;
+    border-radius: 4px;
+    background: white;
+    color: #1976d2;
+    cursor: pointer;
+    height: 48px;
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  .mobile-number-btn:hover {
+    background: #1976d2;
+    color: white;
+  }
+
+  .mobile-number-btn:active {
+    transform: scale(0.95);
+  }
+
+  .mobile-delete-btn {
+    background: #d32f2f;
+    color: white;
+    border-color: #d32f2f;
+    font-size: 1.1rem;
+  }
+
+  .mobile-delete-btn:hover {
+    background: #b71c1c;
+    border-color: #b71c1c;
+  }
+
+  @media (max-width: 900px) {
+    .mobile-input {
+      display: grid;
+    }
+
+    .color-buttons {
+      width: 100%;
+      justify-content: center;
+      order: 1;
+    }
   }
 </style> 

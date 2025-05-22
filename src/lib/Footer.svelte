@@ -53,4 +53,10 @@
     color: #1565c0;
     background: none;
   }
+
+  @media (max-width: 900px) {
+    .footer {
+      position: static;
+    }
+  }
 </style> 
